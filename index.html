@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Metrics Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:           #05080f;
+      --bg2:          #080d18;
+      --surface:      #0c1220;
+      --surface2:     #101828;
+      --surface3:     #14203a;
+      --border:       rgba(80, 120, 200, 0.14);
+      --border-hi:    rgba(130, 180, 255, 0.28);
+      --text:         #e8efff;
+      --muted:        #7a90b8;
+      --dim:          #3d5070;
+      --accent:       #7eb8ff;
+      --accent2:      #a78bfa;
+      --gold:         #e2b96a;
+      --gold-soft:    rgba(226, 185, 106, 0.12);
+      --green:        #4de8a4;
+      --green-soft:   rgba(77, 232, 164, 0.12);
+      --red:          #ff6b8a;
+      --cyan:         #67e8f9;
+      --mono:         'DM Mono', monospace;
+      --sans:         'DM Sans', sans-serif;
+      --serif:        'Cormorant Garamond', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      min-height: 100vh;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ─── Ambient background ─── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 900px 600px at 10% -5%,  rgba(94,147,255,0.07) 0%, transparent 65%),
+        radial-gradient(ellipse 700px 500px at 90% 5%,   rgba(167,139,250,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 600px 400px at 50% 110%, rgba(77,232,164,0.04) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body > * { position: relative; z-index: 1; }
+
+    /* ─── Noise texture overlay ─── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, rgba(5,8,15,0.97) 0%, rgba(5,8,15,0.88) 100%);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 28px;
+      right: 28px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(126,184,255,0.4), rgba(167,139,250,0.4), transparent);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 700;
+      color: #05080f;
+      flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(126,184,255,0.25);
+    }
+
+    .header-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .header h1 {
+      font-family: var(--serif);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.015em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .header h1 span {
+      color: var(--accent);
+      opacity: 0.45;
+      font-weight: 300;
+      margin: 0 4px;
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+    }
+
+    .header-year { color: var(--muted); }
+    .header-sep  { opacity: 0.35; }
+
+    .header-month {
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 11px;
+      transition: border-color 0.3s;
+    }
+
+    .live-badge:hover { border-color: var(--border-hi); }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ─── FILTER BAR ─── */
+    .filters {
+      background: rgba(8,13,24,0.8);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 9.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+
+    .chips-wrap {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      color: var(--muted);
+      padding: 4px 11px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-family: var(--mono);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s cubic-bezier(.22,.68,0,1.2);
+      letter-spacing: 0.02em;
+    }
+
+    .chip:hover {
+      transform: translateY(-1px);
+      border-color: var(--border-hi);
+      color: var(--text);
+      background: rgba(126,184,255,0.06);
+    }
+
+    .chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(126,184,255,0.1);
+      box-shadow: 0 0 10px rgba(126,184,255,0.12), inset 0 0 10px rgba(126,184,255,0.04);
+    }
+
+    .chip.total.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: var(--gold-soft);
+      box-shadow: 0 0 10px rgba(226,185,106,0.12);
+    }
+
+    .divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border);
+    }
+
+    .reset-btn {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 5px 12px;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reset-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+      background: rgba(255,107,138,0.06);
+    }
+
+    /* ─── MAIN CONTENT ─── */
+    .container {
+      padding: 28px 28px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* ─── CARD ─── */
+    .card {
+      background: linear-gradient(170deg, rgba(12,18,32,0.98) 0%, rgba(8,13,24,0.98) 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.02) inset,
+        0 24px 48px rgba(0,0,0,0.45),
+        0 1px 0 rgba(126,184,255,0.08) inset;
+      animation: cardReveal 0.5s ease both;
+    }
+
+    .card:nth-child(2) { animation-delay: 0.1s; }
+
+    @keyframes cardReveal {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-head {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .card-icon.blue  { background: rgba(126,184,255,0.12); color: var(--accent); border: 1px solid rgba(126,184,255,0.2); }
+    .card-icon.violet { background: rgba(167,139,250,0.12); color: var(--accent2); border: 1px solid rgba(167,139,250,0.2); }
+
+    .card-head h2 {
+      font-family: var(--serif);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+
+    .card-sub {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .card-badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+    }
+
+    /* ─── TABLE ─── */
+    .table-wrap {
+      overflow-x: auto;
+      /* custom scrollbar */
+      scrollbar-width: thin;
+      scrollbar-color: var(--surface3) transparent;
+    }
+
+    .table-wrap::-webkit-scrollbar { height: 4px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    /* Column widths */
+    table colgroup col:first-child { width: 210px; }
+
+    thead tr {
+      background: rgba(10,17,35,0.8);
+    }
+
+    th {
+      padding: 10px 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      white-space: nowrap;
+    }
+
+    th:first-child {
+      text-align: left;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    th.total-col {
+      color: var(--gold);
+    }
+
+    /* Week column separators */
+    th:not(:first-child)::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 12px;
+      background: var(--border);
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    th { position: relative; }
+
+    td {
+      padding: 9px 14px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      border-bottom: 1px solid rgba(42,54,80,0.4);
+      color: var(--muted);
+      transition: background 0.15s ease, color 0.15s ease;
+      position: relative;
+    }
+
+    td:first-child {
+      text-align: left;
+      padding-left: 20px;
+      font-family: var(--sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    td.total-col {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* Week/Total headers and values should be bold white */
+    #tableOne th:not(:first-child),
+    #tableTwo th:not(:first-child) {
+      color: #9fd0ff;
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(126, 184, 255, 0.35);
+    }
+
+    #tableOne th.total-col,
+    #tableTwo th.total-col {
+      color: #ffd98a;
+      text-shadow: 0 0 10px rgba(226, 185, 106, 0.45);
+    }
+
+    #tableOne td:not(:first-child),
+    #tableTwo td:not(:first-child) {
+      color: #ffffff !important;
+      font-weight: 700;
+    }
+
+    /* Zebra rows */
+    tbody tr:nth-child(even) td {
+      background: rgba(255,255,255,0.012);
+    }
+
+    /* Hover row highlight */
+    tbody tr {
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:hover td {
+      background: rgba(126,184,255,0.06);
+      color: var(--text);
+    }
+
+    tbody tr:hover td:first-child {
+      color: var(--accent);
+    }
+
+    /* Last row no border */
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Metric category decorators */
+    td.metric-name::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--accent);
+      margin-right: 8px;
+      vertical-align: middle;
+      opacity: 0.5;
+    }
+
+    /* Value coloring */
+    .val-high  { color: var(--green) !important; }
+    .val-mid   { color: var(--cyan)  !important; }
+    .val-low   { color: var(--muted) !important; }
+    .val-zero  { color: var(--dim)   !important; }
+    .val-rev   { color: var(--gold)  !important; font-weight: 600; }
+
+    /* ─── FOOTER GRADIENT ─── */
+    .footer-rule {
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--border-hi) 30%, var(--border-hi) 70%, transparent 100%);
+      margin: 0 28px;
+      opacity: 0.6;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .header    { padding: 0 16px; }
+      .filters   { padding: 10px 16px; gap: 10px; }
+      .container { padding: 16px 16px 32px; gap: 16px; }
+      .header h1 { font-size: 15px; }
+      .header-meta { font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══ HEADER ══ -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-mark">P</div>
+      <div class="header-title-block">
+        <h1>Plutus <span>·</span> Bucket Wise Lead Categorisation</h1>
+        <div class="header-meta">
+          <span class="header-year">2026</span>
+          <span class="header-sep">／</span>
+          <span class="header-month" id="currentMonth">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span id="lastUpdated">Loading…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ FILTERS ══ -->
+  <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">Source</span>
+      <div id="sourceFilters" class="chips-wrap"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="filter-group">
+      <span class="filter-label">Week</span>
+      <div id="weekFilters" class="chips-wrap"></div>
+    </div>
+    <div class="divider"></div>
+    <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
+  </div>
+
+  <!-- ══ CONTENT ══ -->
+  <main class="container">
+
+    <!-- Table 1 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon blue">📊</div>
+          <div>
+            <h2>Performance Overview</h2>
+            <div class="card-sub">Leads · Sales · Revenue · CPL</div>
+          </div>
+        </div>
+        <span class="card-badge" id="t1Badge">9 metrics</span>
+      </div>
+      <div class="table-wrap">
+        <table id="tableOne">
+          <colgroup><col><col><col><col><col><col></colgroup>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Week 1</th>
+              <th>Week 2</th>
+              <th>Week 3</th>
+              <th>Week 4</th>
+              <th class="total-col">Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Table 2 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">
+          <div class="card-icon violet">🎯</div>
+          <div>
+            <h2>Lead Quality Breakdown</h2>
+            <div class="card-sub">Connection · Buckets · CPL</div>
+          </div>
+        </div>
+        <span class="card-badge" id="t2Badge">9 metrics</span>
+      </div>
+      <div class="table-wrap">
+        <table id="tableTwo">
+          <colgroup><col><col><col><col><col><col></colgroup>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Week 1</th>
+              <th>Week 2</th>
+              <th>Week 3</th>
+              <th>Week 4</th>
+              <th class="total-col">Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="footer-rule"></div>
+
+  <script>
+    const API_CANDIDATES = ["/.netlify/functions/data"];
+    const CSV_CACHE_KEY = "plutus_weekly_csv_cache_v1";
+    const FETCH_TIMEOUT_MS = 20000;
+    const MAX_RETRIES_PER_SOURCE = 3;
+    const SOURCE_KEY = "sources";
+    const WEEK_KEY = "week";
+    const WEEK_COLS = ["Week 1", "Week 2", "Week 3", "Week 4"];
+    const TABLE_COLS = [...WEEK_COLS, "Total"];
+
+    const TABLE_ONE_METRICS = [
+      "Total_Lead", "Dialled %", "Connected %", "VC_SCHEDULED", "VC_DONE",
+      "CLOSURE / PAYMENT", "Total_Sale", "Revenue", "Overall_CPL"
+    ];
+    const TABLE_TWO_METRICS = [
+      "Connected %", "COLD / DEAD", "NURTURE", "WARM/NI",
+      "WARM Int", "HOT / ACTIVE", "CLOSURE / PAYMENT", "Not_Connected", "CPL_NC"
+    ];
+
+    // ── Value color classification ──
+    function classifyCell(metric, value) {
+      if (!isFinite(value) || value === 0) return 'val-zero';
+      if (metric === 'Revenue') return 'val-rev';
+      if (metric === 'Total_Lead' || metric === 'Total_Sale') return 'val-mid';
+      if (metric === 'COLD / DEAD' || metric === 'Not_Connected') return 'val-low';
+      if (metric === 'HOT / ACTIVE' || metric === 'CLOSURE / PAYMENT' || metric === 'VC_DONE') return 'val-high';
+      return '';
+    }
+
+    let ALL_DATA = [];
+    let sourceValues = [];
+    let weekValues = [];
+    let activeSources = new Set();
+    let activeWeeks = new Set();
+
+    function hasValue(v) { return v !== undefined && v !== null && String(v).trim() !== ''; }
+    function parseNumber(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+    function isNonZeroValue(v) {
+      if (!hasValue(v)) return false;
+      const s = String(v).trim(), n = Number(s);
+      return Number.isFinite(n) ? n !== 0 : s.toLowerCase() !== '0';
+    }
+    function leadMobileCount(rows, pred = () => true) {
+      return rows.reduce((c, r) => hasValue(r.leadMobile) && pred(r) ? c + 1 : c, 0);
+    }
+    function pct(n, d) { return d <= 0 ? 0 : (n / d) * 100; }
+    function isConnectedLead(r) { return r.connected > 0 && r.callDuration >= 0.4; }
+
+    function normalizeRow(raw) {
+      return {
+        ...raw,
+        sources:      raw.sources || raw['Sources::multi-filter'] || '',
+        week:         raw.week    || raw['Week::multi-filter']    || '',
+        leadMobile:   raw.leadMobile || '',
+        connected:    parseNumber(raw.connected),
+        callDuration: parseNumber(raw.Call_Duration),
+        cpl:          parseNumber(raw.CPL),
+        revenue:      parseNumber(raw.revenue),
+        bucket:       String(raw.Bucket  || '').trim(),
+        state:        String(raw.State   || '').trim(),
+        vcSch:        raw['VC_Sch'],
+        vcDate:       raw['VC Date'],
+        txnDate:      raw.Txn_date
+      };
+    }
+
+    function parseCSV(csv) {
+      const lines   = csv.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const vals = line.split(','), row = {};
+        headers.forEach((h, i) => { row[h] = vals[i] !== undefined ? vals[i].trim() : ''; });
+        return normalizeRow(row);
+      });
+    }
+
+    function removeAggregateTotals(rows) {
+      return rows.filter(r => {
+        const src = String(r[SOURCE_KEY] || '').trim().toLowerCase();
+        const wk  = String(r[WEEK_KEY]   || '').trim().toLowerCase();
+        return src !== 'total' && wk !== 'total';
+      });
+    }
+
+    function normalizeWeek(value) {
+      const m = String(value || '').trim().match(/week\s*(\d+)/i);
+      return m ? `Week ${m[1]}` : '';
+    }
+
+    function buildFilters() {
+      sourceValues = [...new Set(ALL_DATA.map(r => r[SOURCE_KEY]).filter(Boolean))].sort();
+      weekValues   = WEEK_COLS.filter(w => ALL_DATA.some(r => normalizeWeek(r[WEEK_KEY]) === w));
+
+      const sw = document.getElementById('sourceFilters');
+      sw.innerHTML = '';
+      sw.appendChild(makeChip('Total', 'source', true));
+      sourceValues.forEach(s => sw.appendChild(makeChip(s, 'source', false)));
+
+      const ww = document.getElementById('weekFilters');
+      ww.innerHTML = '';
+      ww.appendChild(makeChip('Total', 'week', true));
+      weekValues.forEach(w => ww.appendChild(makeChip(w, 'week', false)));
+    }
+
+    function makeChip(value, type, isTotal) {
+      const chip = document.createElement('span');
+      chip.className = `chip${isTotal ? ' total' : ''}`;
+      chip.textContent = isTotal ? 'Total' : value;
+      chip.onclick = () => toggleChip(type, value, isTotal);
+      return chip;
+    }
+
+    function setAll(type, on) {
+      const vals = type === 'source' ? sourceValues : weekValues;
+      const set  = type === 'source' ? activeSources : activeWeeks;
+      set.clear();
+      if (on) vals.forEach(v => set.add(v));
+    }
+
+    function toggleChip(type, value, isTotal) {
+      const vals = type === 'source' ? sourceValues : weekValues;
+      const set  = type === 'source' ? activeSources : activeWeeks;
+      if (isTotal) {
+        setAll(type, !(set.size === vals.length && vals.length > 0));
+      } else {
+        set.has(value) ? set.delete(value) : set.add(value);
+      }
+      syncChipStates();
+      renderTables();
+    }
+
+    function syncChipStates() {
+      syncGroup(sourceValues, activeSources, 'sourceFilters');
+      syncGroup(weekValues,   activeWeeks,   'weekFilters');
+    }
+
+    function syncGroup(values, activeSet, id) {
+      const chips = document.getElementById(id).querySelectorAll('.chip');
+      chips.forEach(chip => {
+        chip.classList.remove('active');
+        if (chip.textContent === 'Total') {
+          if (activeSet.size === values.length && values.length > 0) chip.classList.add('active');
+        } else if (activeSet.has(chip.textContent)) {
+          chip.classList.add('active');
+        }
+      });
+    }
+
+    function resetFilters() {
+      activeSources.clear();
+      activeWeeks.clear();
+      syncChipStates();
+      renderTables();
+    }
+
+    function filteredRows() {
+      return ALL_DATA.filter(r => {
+        const src = r[SOURCE_KEY];
+        const wk  = normalizeWeek(r[WEEK_KEY]);
+        if (activeSources.size > 0 && !activeSources.has(src)) return false;
+        if (activeWeeks.size   > 0 && !activeWeeks.has(wk))    return false;
+        return true;
+      });
+    }
+
+    function metricValue(rows, metric) {
+      const totalLead     = leadMobileCount(rows);
+      const connectedLead = leadMobileCount(rows, isConnectedLead);
+      switch (metric) {
+        case 'Total_Lead':        return totalLead;
+        case 'Dialled %': {
+          const d = leadMobileCount(rows, r => r.cpl > 0);
+          return pct(d, totalLead);
+        }
+        case 'Connected %':       return pct(connectedLead, totalLead);
+        case 'VC_SCHEDULED': {
+          const v = leadMobileCount(rows, r => isNonZeroValue(r.vcSch));
+          return pct(v, connectedLead);
+        }
+        case 'VC_DONE': {
+          const v = leadMobileCount(rows, r => isNonZeroValue(r.vcDate));
+          const totalVcScheduled = leadMobileCount(rows, r => isNonZeroValue(r.vcSch));
+          return pct(v, totalVcScheduled);
+        }
+        case 'CLOSURE / PAYMENT': {
+          const c = leadMobileCount(rows, r => isConnectedLead(r) && r.bucket === 'CLOSURE / PAYMENT');
+          return pct(c, totalLead);
+        }
+        case 'Total_Sale':        return leadMobileCount(rows, r => hasValue(r.txnDate));
+        case 'Revenue':           return rows.reduce((s, r) => s + r.revenue, 0);
+        case 'Overall_CPL': {
+          if (totalLead === 0) return 0;
+          return rows.reduce((s, r) => s + r.cpl, 0) / totalLead;
+        }
+        case 'COLD / DEAD':
+        case 'NURTURE':
+        case 'WARM/NI':
+        case 'WARM Int':
+        case 'HOT / ACTIVE': {
+          const b = leadMobileCount(rows, r => isConnectedLead(r) && r.bucket === metric);
+          return pct(b, totalLead);
+        }
+        case 'Not_Connected': {
+          return pct(Math.max(totalLead - connectedLead, 0), totalLead);
+        }
+        case 'CPL_NC': {
+          if (totalLead === 0) return 0;
+          return rows.reduce((s, r) => s + r.cpl, 0) / totalLead;
+        }
+        default: return 0;
+      }
+    }
+
+    function fmt(metric, value) {
+      if (!isFinite(value)) return '—';
+      if (value === 0) return '—';
+      if (metric === 'Revenue')
+        return '₹ ' + value.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+      if (metric === 'Total_Lead' || metric === 'Total_Sale')
+        return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      if (['Dialled %', 'Connected %', 'VC_SCHEDULED', 'VC_DONE',
+           'CLOSURE / PAYMENT', 'COLD / DEAD', 'NURTURE', 'WARM/NI',
+           'WARM Int', 'HOT / ACTIVE', 'Not_Connected'].includes(metric))
+        return value.toFixed(2) + '%';
+      if (metric === 'Overall_CPL' || metric.startsWith('CPL'))
+        return value.toFixed(2);
+      return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function weekRows(rows, week) {
+      return rows.filter(r => normalizeWeek(r[WEEK_KEY]) === week);
+    }
+
+    function renderMetricTable(tableId, metricList, rows) {
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      let html = '';
+      metricList.forEach(metric => {
+        html += `<tr><td class="metric-name">${metric}</td>`;
+        TABLE_COLS.forEach((week, idx) => {
+          const targetRows = week === 'Total' ? rows : weekRows(rows, week);
+          const value = metricValue(targetRows, metric);
+          const cls   = classifyCell(metric, value);
+          const isTotal = idx === TABLE_COLS.length - 1;
+          html += `<td class="${[cls, isTotal ? 'total-col' : ''].filter(Boolean).join(' ')}">${fmt(metric, value)}</td>`;
+        });
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+
+    function renderTables() {
+      const rows = filteredRows();
+      renderMetricTable('tableOne', TABLE_ONE_METRICS, rows);
+      renderMetricTable('tableTwo', TABLE_TWO_METRICS, rows);
+    }
+
+    async function fetchWithTimeout(url, opts, ms) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+      finally { clearTimeout(t); }
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function fetchCsvWithFallback() {
+      let lastErr = null;
+      for (const base of API_CANDIDATES) {
+        for (let i = 1; i <= MAX_RETRIES_PER_SOURCE; i++) {
+          try {
+            const url = `${base}${base.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+            const res = await fetchWithTimeout(url, { cache: 'no-store' }, FETCH_TIMEOUT_MS);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const csv = await res.text();
+            if (!csv || !csv.trim()) throw new Error('Empty CSV');
+            localStorage.setItem(CSV_CACHE_KEY, csv);
+            return csv;
+          } catch (e) { lastErr = e; await sleep(300 * i); }
+        }
+      }
+      throw lastErr || new Error('Fetch failed');
+    }
+
+    async function loadData() {
+      try {
+        const csv = await fetchCsvWithFallback();
+        ALL_DATA = removeAggregateTotals(parseCSV(csv));
+        buildFilters(); syncChipStates(); renderTables();
+        document.getElementById('lastUpdated').textContent =
+          `Live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      } catch (_) {
+        const cached = localStorage.getItem(CSV_CACHE_KEY);
+        if (cached && cached.trim()) {
+          ALL_DATA = removeAggregateTotals(parseCSV(cached));
+          buildFilters(); syncChipStates(); renderTables();
+          document.getElementById('lastUpdated').textContent = 'Cached · offline';
+          return;
+        }
+        document.getElementById('lastUpdated').textContent = 'Failed to load';
+      }
+    }
+
+    // Set current month in header
+    document.getElementById('currentMonth').textContent =
+      new Date().toLocaleString('en-IN', { month: 'long' });
+
+    loadData();
+    setInterval(loadData, 60 * 60 * 1000);
+  </script>
+</body>
+</html>
+<!--
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Metrics Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070b14;
+      --bg-grad-a: #0b1222;
+      --bg-grad-b: #121a2e;
+      --surface: #111826;
+      --surface2: #162033;
+      --border: #2a3650;
+      --text: #ecf2ff;
+      --muted: #9ba9c4;
+      --accent: #5ea6ff;
+      --accent-soft: rgba(94, 166, 255, 0.18);
+      --green: #45d483;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background:
+        radial-gradient(1000px 500px at 15% -10%, var(--bg-grad-b), transparent 70%),
+        radial-gradient(900px 600px at 110% 10%, #0d1a33, transparent 65%),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+
+    .header {
+      background: linear-gradient(180deg, rgba(17, 24, 38, 0.95), rgba(17, 24, 38, 0.82));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      padding: 16px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 10px;
+    }
+
+    .filters {
+      background: rgba(17, 24, 38, 0.9);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 22px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      padding: 6px 11px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: var(--mono);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.18s ease;
+    }
+
+    .chip:hover {
+      transform: translateY(-1px);
+      border-color: #3a4b6d;
+      color: #c7d3ea;
+    }
+
+    .chip.active {
+      border-color: var(--accent);
+      color: #dcecff;
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px rgba(94, 166, 255, 0.2);
+    }
+
+    .chip.total {
+      border-color: var(--green);
+    }
+
+    .chip.total.active {
+      color: var(--green);
+      border-color: var(--green);
+      background: rgba(63, 185, 80, 0.15);
+    }
+
+    .reset {
+      color: #b8c5df;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .reset:hover {
+      border-color: #3f5378;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .container {
+      padding: 18px 22px 30px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(17, 24, 38, 0.98), rgba(17, 24, 38, 0.94));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .card-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: #b4c3dd;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 650px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid rgba(42, 54, 80, 0.8);
+      padding: 9px 10px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    th:first-child, td:first-child {
+      text-align: left;
+      font-family: var(--sans);
+      font-weight: 500;
+    }
+
+    th {
+      background: #172235;
+      color: #a8b8d6;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 10px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    tbody tr:hover {
+      background: rgba(94, 166, 255, 0.08);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Weekly Metrics Dashboard</h1>
+    <div class="meta" id="lastUpdated">Loading...</div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Source</span>
+      <div id="sourceFilters" class="filter-row"></div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Week</span>
+      <div id="weekFilters" class="filter-row"></div>
+    </div>
+    <span class="reset" onclick="resetFilters()">Reset</span>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="card-head">Table 1</div>
+      <div class="table-wrap">
+        <table id="tableOne">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Week 1</th>
+              <th>Week 2</th>
+              <th>Week 3</th>
+              <th>Week 4</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Table 2</div>
+      <div class="table-wrap">
+        <table id="tableTwo">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Week 1</th>
+              <th>Week 2</th>
+              <th>Week 3</th>
+              <th>Week 4</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_CANDIDATES = ["/.netlify/functions/data"];
+    const CSV_CACHE_KEY = "plutus_weekly_csv_cache_v1";
+    const FETCH_TIMEOUT_MS = 20000;
+    const MAX_RETRIES_PER_SOURCE = 3;
+
+    const SOURCE_KEY = "sources";
+    const WEEK_KEY = "week";
+    const WEEK_COLS = ["Week 1", "Week 2", "Week 3", "Week 4"];
+    const TABLE_COLS = [...WEEK_COLS, "Total"];
+
+    const TABLE_ONE_METRICS = [
+      "Total_Lead", "Dialled %", "Connected %", "VC_SCHEDULED", "VC_DONE",
+      "CLOSURE / PAYMENT", "Total_Sale", "Revenue", "Overall_CPL"
+    ];
+
+    const TABLE_TWO_METRICS = [
+      "Connected %", "COLD / DEAD", "NURTURE", "WARM/NI",
+      "WARM Int", "HOT / ACTIVE", "CLOSURE / PAYMENT", "Not_Connected", "CPL_NC"
+    ];
+
+    let ALL_DATA = [];
+    let sourceValues = [];
+    let weekValues = [];
+
+    let activeSources = new Set();
+    let activeWeeks = new Set();
+
+    function hasValue(value) {
+      return value !== undefined && value !== null && String(value).trim() !== "";
+    }
+
+    function parseNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function isNonZeroValue(value) {
+      if (!hasValue(value)) return false;
+      const str = String(value).trim();
+      const n = Number(str);
+      if (Number.isFinite(n)) return n !== 0;
+      return str.toLowerCase() !== "0";
+    }
+
+    function leadMobileCount(rows, predicate = () => true) {
+      return rows.reduce((count, row) => {
+        if (!hasValue(row.leadMobile)) return count;
+        if (!predicate(row)) return count;
+        return count + 1;
+      }, 0);
+    }
+
+    function pct(numerator, denominator) {
+      if (denominator <= 0) return 0;
+      return (numerator / denominator) * 100;
+    }
+
+    function isConnectedLead(row) {
+      return row.connected > 0 && row.callDuration >= 0.4;
+    }
+
+    function normalizeRow(raw) {
+      return {
+        ...raw,
+        sources: raw.sources || raw["Sources::multi-filter"] || "",
+        week: raw.week || raw["Week::multi-filter"] || "",
+        leadMobile: raw.leadMobile || "",
+        connected: parseNumber(raw.connected),
+        callDuration: parseNumber(raw.Call_Duration),
+        cpl: parseNumber(raw.CPL),
+        revenue: parseNumber(raw.revenue),
+        bucket: String(raw.Bucket || "").trim(),
+        state: String(raw.State || "").trim(),
+        vcSch: raw["VC_Sch"],
+        vcDate: raw["VC Date"],
+        txnDate: raw.Txn_date
+      };
+    }
+
+    function parseCSV(csv) {
+      const lines = csv.trim().split("\n");
+      const headers = lines[0].split(",").map((h) => h.trim());
+      return lines.slice(1).map((line) => {
+        const vals = line.split(",");
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = vals[idx] !== undefined ? vals[idx].trim() : "";
+        });
+        return normalizeRow(row);
+      });
+    }
+
+    function removeAggregateTotals(rows) {
+      return rows.filter((r) => {
+        const src = String(r[SOURCE_KEY] || "").trim().toLowerCase();
+        const wk = String(r[WEEK_KEY] || "").trim().toLowerCase();
+        return src !== "total" && wk !== "total";
+      });
+    }
+
+    function normalizeWeek(value) {
+      const m = String(value || "").trim().match(/week\s*(\d+)/i);
+      if (!m) return "";
+      return `Week ${m[1]}`;
+    }
+
+    function buildFilters() {
+      sourceValues = [...new Set(ALL_DATA.map((r) => r[SOURCE_KEY]).filter(Boolean))].sort();
+      // Keep week filter fixed to Week 1..Week 4 in required order.
+      weekValues = WEEK_COLS.filter((week) =>
+        ALL_DATA.some((r) => normalizeWeek(r[WEEK_KEY]) === week)
+      );
+
+      const sourceWrap = document.getElementById("sourceFilters");
+      sourceWrap.innerHTML = "";
+      sourceWrap.appendChild(makeChip("Total", "source", true));
+      sourceValues.forEach((src) => sourceWrap.appendChild(makeChip(src, "source", false)));
+
+      const weekWrap = document.getElementById("weekFilters");
+      weekWrap.innerHTML = "";
+      weekWrap.appendChild(makeChip("Total", "week", true));
+      weekValues.forEach((wk) => weekWrap.appendChild(makeChip(wk, "week", false)));
+    }
+
+    function makeChip(value, type, isTotal) {
+      const chip = document.createElement("span");
+      chip.className = `chip${isTotal ? " total" : ""}`;
+      chip.textContent = isTotal ? "Total" : value;
+      chip.onclick = () => toggleChip(type, value, isTotal);
+      return chip;
+    }
+
+    function setAll(type, shouldSelectAll) {
+      const values = type === "source" ? sourceValues : weekValues;
+      const targetSet = type === "source" ? activeSources : activeWeeks;
+      targetSet.clear();
+      if (shouldSelectAll) values.forEach((v) => targetSet.add(v));
+    }
+
+    function toggleChip(type, value, isTotal) {
+      const values = type === "source" ? sourceValues : weekValues;
+      const targetSet = type === "source" ? activeSources : activeWeeks;
+
+      if (isTotal) {
+        const allSelected = targetSet.size === values.length && values.length > 0;
+        setAll(type, !allSelected);
+      } else {
+        if (targetSet.has(value)) targetSet.delete(value);
+        else targetSet.add(value);
+      }
+
+      syncChipStates();
+      renderTables();
+    }
+
+    function syncChipStates() {
+      syncGroup("source", sourceValues, activeSources, "sourceFilters");
+      syncGroup("week", weekValues, activeWeeks, "weekFilters");
+    }
+
+    function syncGroup(type, values, activeSet, containerId) {
+      const chips = document.getElementById(containerId).querySelectorAll(".chip");
+      chips.forEach((chip) => chip.classList.remove("active"));
+      chips.forEach((chip) => {
+        if (chip.textContent === "Total") {
+          if (activeSet.size === values.length && values.length > 0) chip.classList.add("active");
+          return;
+        }
+        if (activeSet.has(chip.textContent)) chip.classList.add("active");
+      });
+    }
+
+    function resetFilters() {
+      activeSources.clear();
+      activeWeeks.clear();
+      syncChipStates();
+      renderTables();
+    }
+
+    function filteredRows() {
+      return ALL_DATA.filter((r) => {
+        const src = r[SOURCE_KEY];
+        const wk = normalizeWeek(r[WEEK_KEY]);
+        if (activeSources.size > 0 && !activeSources.has(src)) return false;
+        if (activeWeeks.size > 0 && !activeWeeks.has(wk)) return false;
+        return true;
+      });
+    }
+
+    function metricValue(rows, metric) {
+      const totalLead = leadMobileCount(rows);
+      const connectedLead = leadMobileCount(rows, isConnectedLead);
+
+      switch (metric) {
+        case "Total_Lead":
+          return totalLead;
+        case "Dialled %": {
+          const dialled = leadMobileCount(rows, (r) => r.cpl > 0);
+          return pct(dialled, totalLead);
+        }
+        case "Connected %":
+          return pct(connectedLead, totalLead);
+        case "VC_SCHEDULED": {
+          const vcScheduled = leadMobileCount(rows, (r) => isNonZeroValue(r.vcSch));
+          return pct(vcScheduled, connectedLead);
+        }
+        case "VC_DONE": {
+          const vcDone = leadMobileCount(rows, (r) => isNonZeroValue(r.vcDate));
+          return pct(vcDone, connectedLead);
+        }
+        case "CLOSURE / PAYMENT": {
+          const closed = leadMobileCount(
+            rows,
+            (r) => isConnectedLead(r) && r.bucket === "CLOSURE / PAYMENT"
+          );
+          return pct(closed, totalLead);
+        }
+        case "Total_Sale":
+          return leadMobileCount(rows, (r) => hasValue(r.txnDate));
+        case "Revenue":
+          return rows.reduce((sum, r) => sum + r.revenue, 0);
+        case "Overall_CPL": {
+          if (totalLead === 0) return 0;
+          const totalCpl = rows.reduce((sum, r) => sum + r.cpl, 0);
+          return totalCpl / totalLead;
+        }
+        case "COLD / DEAD":
+        case "NURTURE":
+        case "WARM/NI":
+        case "WARM Int":
+        case "HOT / ACTIVE": {
+          const bucketLeads = leadMobileCount(
+            rows,
+            (r) => isConnectedLead(r) && r.bucket === metric
+          );
+          return pct(bucketLeads, totalLead);
+        }
+        case "Not_Connected": {
+          const notConnected = Math.max(totalLead - connectedLead, 0);
+          return pct(notConnected, totalLead);
+        }
+        case "CPL_NC": {
+          if (totalLead === 0) return 0;
+          const totalCpl = rows.reduce((sum, r) => sum + r.cpl, 0);
+          return totalCpl / totalLead;
+        }
+        default:
+          return 0;
+      }
+    }
+
+    function fmt(metric, value) {
+      if (!isFinite(value)) return "0";
+      if (metric === "Revenue") return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      if (
+        metric.endsWith("%") ||
+        metric === "VC_SCHEDULED" ||
+        metric === "VC_DONE" ||
+        metric === "CLOSURE / PAYMENT" ||
+        metric === "COLD / DEAD" ||
+        metric === "NURTURE" ||
+        metric === "WARM/NI" ||
+        metric === "WARM Int" ||
+        metric === "HOT / ACTIVE" ||
+        metric === "Not_Connected"
+      ) return value.toFixed(2);
+      if (metric === "Overall_CPL" || metric.startsWith("CPL")) return value.toFixed(2);
+      return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function weekRows(rows, week) {
+      return rows.filter((r) => normalizeWeek(r[WEEK_KEY]) === week);
+    }
+
+    function renderMetricTable(tableId, metricList, rows) {
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      let html = "";
+
+      metricList.forEach((metric) => {
+        html += `<tr><td>${metric}</td>`;
+        TABLE_COLS.forEach((week) => {
+          const targetRows = week === "Total" ? rows : weekRows(rows, week);
+          const value = metricValue(targetRows, metric);
+          html += `<td>${fmt(metric, value)}</td>`;
+        });
+        html += "</tr>";
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function renderTables() {
+      const rows = filteredRows();
+      renderMetricTable("tableOne", TABLE_ONE_METRICS, rows);
+      renderMetricTable("tableTwo", TABLE_TWO_METRICS, rows);
+    }
+
+    async function fetchWithTimeout(url, options, timeoutMs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function fetchCsvWithFallback() {
+      let lastErr = null;
+      for (const baseUrl of API_CANDIDATES) {
+        for (let attempt = 1; attempt <= MAX_RETRIES_PER_SOURCE; attempt++) {
+          try {
+            const url = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}_t=${Date.now()}`;
+            const res = await fetchWithTimeout(url, { cache: "no-store" }, FETCH_TIMEOUT_MS);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const csv = await res.text();
+            if (!csv || !csv.trim()) throw new Error("Empty CSV response");
+            localStorage.setItem(CSV_CACHE_KEY, csv);
+            return csv;
+          } catch (e) {
+            lastErr = e;
+            await sleep(300 * attempt);
+          }
+        }
+      }
+      throw lastErr || new Error("CSV fetch failed");
+    }
+
+    async function loadData() {
+      try {
+        const csv = await fetchCsvWithFallback();
+        ALL_DATA = removeAggregateTotals(parseCSV(csv));
+        buildFilters();
+        syncChipStates();
+        renderTables();
+        document.getElementById("lastUpdated").textContent =
+          `Live · Refreshed ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      } catch (_) {
+        const cached = localStorage.getItem(CSV_CACHE_KEY);
+        if (cached && cached.trim()) {
+          ALL_DATA = removeAggregateTotals(parseCSV(cached));
+          buildFilters();
+          syncChipStates();
+          renderTables();
+          document.getElementById("lastUpdated").textContent = "Offline mode · cached data";
+          return;
+        }
+        document.getElementById("lastUpdated").textContent = "Failed to load data";
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 60 * 60 * 1000);
+  </script>
+</body>
+</html>
