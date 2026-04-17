@@ -969,7 +969,10 @@
     function fmt(metric, value, options = {}) {
       const { asCount = false } = options;
       if (!isFinite(value)) return '—';
-      if (value === 0) return '—';
+      if (value === 0) {
+        if (metric === 'PAYMENT LINK') return '0.00%';
+        return '—';
+      }
       if (asCount)
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
       if (metric === 'Revenue')
