@@ -663,7 +663,7 @@
 
     const TABLE_ONE_METRICS = [
       "Total_Lead", "Dialled %", "Connected %", "VC_SCHEDULED", "VC_DONE",
-      "CLOSURE / PAYMENT", "Total_Sale", "One Shot Count", "EMI Count", "Revenue", "AOV", "Overall_CPL"
+      "PAYMENT LINK SENT", "Sale", "Sale Count", "One Shot Count", "EMI Count", "Revenue", "AOV", "Overall_CPL"
     ];
     const TABLE_TWO_METRICS = [
       "Connected %", "COLD / DEAD", "NURTURE", "WARM/NI",
@@ -674,7 +674,7 @@
     function classifyCell(metric, value) {
       if (!isFinite(value) || value === 0) return 'val-zero';
       if (metric === 'Revenue') return 'val-rev';
-      if (metric === 'Total_Lead' || metric === 'Total_Sale') return 'val-mid';
+      if (metric === 'Total_Lead' || metric === 'Sale' || metric === 'Sale Count') return 'val-mid';
       if (metric === 'COLD / DEAD' || metric === 'Not_Connected') return 'val-low';
       if (metric === 'HOT / ACTIVE' || metric === 'CLOSURE / PAYMENT' || metric === 'VC_DONE') return 'val-high';
       return '';
@@ -712,6 +712,7 @@
         bucket:       String(raw.Bucket  || '').trim(),
         state:        String(raw.State   || '').trim(),
         paymentType:  String(raw.Payment_type || '').trim(),
+        paymentLinkSentDate: raw['Payment Link Sent Date'] || raw.Payment_Link_Sent_Date || '',
         vcSch:        raw['VC_Sch'],
         vcDate:       raw['VC Date'],
         txnDate:      raw.Txn_date
@@ -828,29 +829,117 @@
         }
         case 'Connected %':       return pct(connectedLead, totalLead);
         case 'VC_SCHEDULED': {
-          const v = leadMobileCount(rows, r => isNonZeroValue(r.vcSch));
+          const v = leadMobileCount(rows, r => isConnectedLead(r) && isNonZeroValue(r.vcSch));
           return pct(v, connectedLead);
         }
         case 'VC_DONE': {
-          const v = leadMobileCount(rows, r => isNonZeroValue(r.vcDate));
-          const totalVcScheduled = leadMobileCount(rows, r => isNonZeroValue(r.vcSch));
+          const v = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) && isNonZeroValue(r.vcSch) && isNonZeroValue(r.vcDate)
+          );
+          const totalVcScheduled = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) && isNonZeroValue(r.vcSch)
+          );
           return pct(v, totalVcScheduled);
         }
-        case 'CLOSURE / PAYMENT': {
-          const c = leadMobileCount(rows, r => isConnectedLead(r) && r.bucket === 'CLOSURE / PAYMENT');
-          return pct(c, connectedLead);
+        case 'Sale': {
+          const totalConnectedPaymentLinkSent = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate)
+          );
+          const totalSale = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0
+          );
+          return pct(totalSale, totalConnectedPaymentLinkSent);
         }
-        case 'Total_Sale':        return leadMobileCount(rows, r => hasValue(r.txnDate));
+        case 'Sale Count':
+          return leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0
+          );
+        case 'PAYMENT LINK SENT': {
+          const totalConnectedVcDone = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) && isNonZeroValue(r.vcSch) && isNonZeroValue(r.vcDate)
+          );
+          const sent = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate)
+          );
+          return pct(sent, totalConnectedVcDone);
+        }
         case 'One Shot Count':
-          return leadMobileCount(rows, r => r.paymentType.toLowerCase() === 'one shot');
+          return leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0 &&
+              r.paymentType.toLowerCase() === 'one shot'
+          );
         case 'EMI Count':
-          return leadMobileCount(rows, r => r.paymentType.toLowerCase() === 'emi');
-        case 'Revenue':           return rows.reduce((s, r) => s + r.revenue, 0);
+          return leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0 &&
+              r.paymentType.toLowerCase() === 'emi'
+          );
+        case 'Revenue':
+          return rows.reduce(
+            (sum, r) => sum + (
+              isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0
+                ? r.revenue
+                : 0
+            ),
+            0
+          );
         case 'AOV': {
-          const totalSales = leadMobileCount(rows, r => hasValue(r.txnDate));
-          if (totalSales === 0) return 0;
-          const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-          return totalRevenue / totalSales;
+          const saleCount = leadMobileCount(
+            rows,
+            r => isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0
+          );
+          if (saleCount === 0) return 0;
+          const totalRevenue = rows.reduce(
+            (sum, r) => sum + (
+              isConnectedLead(r) &&
+              isNonZeroValue(r.vcSch) &&
+              isNonZeroValue(r.vcDate) &&
+              hasValue(r.paymentLinkSentDate) &&
+              r.revenue > 0
+                ? r.revenue
+                : 0
+            ),
+            0
+          );
+          return totalRevenue / saleCount;
         }
         case 'Overall_CPL': {
           if (totalLead === 0) return 0;
@@ -875,10 +964,6 @@
       }
     }
 
-    function closurePaymentCount(rows) {
-      return leadMobileCount(rows, r => isConnectedLead(r) && r.bucket === 'CLOSURE / PAYMENT');
-    }
-
     function fmt(metric, value, options = {}) {
       const { asCount = false } = options;
       if (!isFinite(value)) return '—';
@@ -891,13 +976,13 @@
         return '₹ ' + value.toLocaleString('en-IN', { maximumFractionDigits: 0 });
       if (
         metric === 'Total_Lead' ||
-        metric === 'Total_Sale' ||
+        metric === 'Sale Count' ||
         metric === 'One Shot Count' ||
         metric === 'EMI Count'
       )
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
       if (['Dialled %', 'Connected %', 'VC_SCHEDULED', 'VC_DONE',
-           'CLOSURE / PAYMENT', 'COLD / DEAD', 'NURTURE', 'WARM/NI',
+           'PAYMENT LINK SENT', 'Sale', 'CLOSURE / PAYMENT', 'COLD / DEAD', 'NURTURE', 'WARM/NI',
            'WARM Int', 'HOT / ACTIVE', 'Not_Connected'].includes(metric))
         return value.toFixed(2) + '%';
       if (metric === 'Overall_CPL' || metric.startsWith('CPL'))
@@ -916,14 +1001,10 @@
         html += `<tr><td class="metric-name">${metric}</td>`;
         TABLE_COLS.forEach((week, idx) => {
           const targetRows = week === 'Total' ? rows : weekRows(rows, week);
-          const value = tableId === 'tableOne' && metric === 'CLOSURE / PAYMENT'
-            ? closurePaymentCount(targetRows)
-            : metricValue(targetRows, metric);
+          const value = metricValue(targetRows, metric);
           const cls   = classifyCell(metric, value);
           const isTotal = idx === TABLE_COLS.length - 1;
-          html += `<td class="${[cls, isTotal ? 'total-col' : ''].filter(Boolean).join(' ')}">${fmt(metric, value, {
-            asCount: tableId === 'tableOne' && metric === 'CLOSURE / PAYMENT'
-          })}</td>`;
+          html += `<td class="${[cls, isTotal ? 'total-col' : ''].filter(Boolean).join(' ')}">${fmt(metric, value)}</td>`;
         });
         html += '</tr>';
       });
