@@ -667,7 +667,7 @@
     ];
     const TABLE_TWO_METRICS = [
       "Connected %", "COLD / DEAD", "NURTURE", "WARM/NI",
-      "WARM Int", "HOT / ACTIVE", "CLOSURE / PAYMENT", "Not_Connected", "CPL_NC"
+      "WARM Int", "HOT / ACTIVE", "SALES DONE", "PAYMENT LINK", "Not_Connected", "CPL_NC"
     ];
 
     // ── Value color classification ──
@@ -949,7 +949,9 @@
         case 'NURTURE':
         case 'WARM/NI':
         case 'WARM Int':
-        case 'HOT / ACTIVE': {
+        case 'HOT / ACTIVE':
+        case 'SALES DONE':
+        case 'PAYMENT LINK': {
           const b = leadMobileCount(rows, r => isConnectedLead(r) && r.bucket === metric);
           return pct(b, connectedLead);
         }
@@ -983,7 +985,7 @@
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
       if (['Dialled %', 'Connected %', 'VC_SCHEDULED', 'VC_DONE',
            'PAYMENT LINK SENT', 'Sale', 'CLOSURE / PAYMENT', 'COLD / DEAD', 'NURTURE', 'WARM/NI',
-           'WARM Int', 'HOT / ACTIVE', 'Not_Connected'].includes(metric))
+           'WARM Int', 'HOT / ACTIVE', 'SALES DONE', 'PAYMENT LINK', 'Not_Connected'].includes(metric))
         return value.toFixed(2) + '%';
       if (metric === 'Overall_CPL' || metric.startsWith('CPL'))
         return value.toFixed(2);
